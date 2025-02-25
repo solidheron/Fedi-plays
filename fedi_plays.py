@@ -22,32 +22,45 @@ key_mappings = {
 
 def send_gameboy_command(pyboy, command, hold_duration=0.35):
     """Send a command to the PyBoy emulator with a delay between button presses."""
-    if "*" in command:
-        # Command like "a*2" or "left*15"
-        button, repetitions = command.split('*')
-        repetitions = int(repetitions)  # Convert to integer
-        
-        # Ensure the repetitions are capped at 10
-        if repetitions > 10:
-            repetitions = 10
+    # List to keep track of buttons that are pressed
+    pressed_buttons = []
 
-        if button in key_mappings:
-            mapped_key = key_mappings[button]
-            for _ in range(repetitions):
+    try:
+        if "*" in command:
+            # Command like "a*2" or "left*15"
+            button, repetitions = command.split('*')
+            repetitions = int(repetitions)  # Convert to integer
+            
+            # Ensure the repetitions are capped at 10
+            if repetitions > 10:
+                repetitions = 10
+
+            if button in key_mappings:
+                mapped_key = key_mappings[button]
+                for _ in range(repetitions):
+                    pyboy.button_press(mapped_key)
+                    pressed_buttons.append(mapped_key)  # Track the button pressed
+                    time.sleep(hold_duration)  # Hold the button for the specified duration
+            else:
+                print(f"Invalid button in command: {command}")
+        else:
+            # Regular command like "a", "left"
+            if command in key_mappings:
+                mapped_key = key_mappings[command]
                 pyboy.button_press(mapped_key)
-                time.sleep(hold_duration)
-                pyboy.button_release(mapped_key)
-        else:
-            print(f"Invalid button in command: {command}")
-    else:
-        # Regular command like "a", "left"
-        if command in key_mappings:
-            mapped_key = key_mappings[command]
-            pyboy.button_press(mapped_key)
-            time.sleep(hold_duration)
-            pyboy.button_release(mapped_key)
-        else:
-            print(f"Invalid command: {command}")
+                pressed_buttons.append(mapped_key)  # Track the button pressed
+                time.sleep(hold_duration)  # Hold the button for the specified duration
+            else:
+                print(f"Invalid command: {command}")
+
+    finally:
+        # Release all buttons after the command has been executed
+        for button in pressed_buttons:
+            pyboy.button_release(button)
+            time.sleep(0.1)  # Optional small delay between releasing buttons to avoid sticking
+
+
+
 
 def save_state(pyboy, save_file):
     """Save the current state of the PyBoy emulator."""
@@ -74,9 +87,6 @@ def load_state(pyboy, save_file):
     except Exception as e:
         print(f"Error loading state: {e}")
 
-import threading
-
-# Update run_pyboy to return pyboy and pass it to the chat checking
 def run_pyboy(rom_path, stop_event, pyboy_holder, save_interval=1800):
     """Run the PyBoy emulator in a separate thread and share the instance."""
     pyboy = PyBoy(rom_path)
@@ -177,49 +187,28 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
         # Wait before checking for new messages again
         await asyncio.sleep(4)
 
-async def main():
-    # Initialize PyBoy
-    print("Initializing PyBoy...")
-    rom_path = 'path/to/game.gbc' #put the path to the the gameboy or gameboy color game that you want to play on the emulator
-    if not os.path.exists(rom_path):
-        print(f"Error: ROM file not found at {rom_path}")
-        return
-
-    # Event to stop PyBoy thread gracefully
-    stop_event = threading.Event()
-
-    # Thread-safe container for sharing pyboy instance
-    pyboy_holder = {}
-
-    # Start PyBoy in a separate thread
-    pyboy_thread = threading.Thread(target=run_pyboy, args=(rom_path, stop_event, pyboy_holder))
-    pyboy_thread.start()
-
-    # Start checking the chat in a separate task with asyncio
+async def run_asyncio_tasks():
+    """Run the async tasks."""
     async with async_playwright() as p:
         try:
-            # Launch the browser (use Chromium instead of Firefox)
-            browser = await p.chromium.launch(headless=True)  # You can set headless=False for debugging
+            # Launch the browser in headless mode or not based on your needs
+            browser = await p.chromium.launch(headless=False)  # Try headless=False for debugging
             print("Chromium browser launched.")
 
             page = await browser.new_page()
-            ##place chat url on page.goto() to read the chat of the peertube stream
-            await page.goto("chat url", timeout=60000)  # Timeout after 60 seconds
+            await page.goto("Chat_url_here", timeout=60000)
             print("Page loaded.")
 
             # Wait for the first message to load
-            await page.wait_for_selector('.message', timeout=10000)  # Wait up to 10 seconds for the first message to appear
+            await page.wait_for_selector('.message', timeout=10000)  # Wait for the first message to appear
             print("First message detected, starting the chat checking thread...")
 
-            # Start the chat checking in its own async task
+            # Create the task for checking chat messages
             chat_task = asyncio.create_task(check_chat_messages(page, stop_event, pyboy_holder))
 
-            # Keep both threads running: PyBoy and chat checker
-            while pyboy_thread.is_alive():
-                await asyncio.sleep(1)  # Prevent the main thread from exiting prematurely
-
+            # Run the loop to allow asyncio tasks to run
             await chat_task  # Ensure chat task completes
-
+            
         except TimeoutError:
             print("Error: Timed out while waiting for the page to load or the first message.")
         except Exception as e:
@@ -233,8 +222,22 @@ async def main():
             stop_event.set()
             pyboy_thread.join()
 
-    print("Script finished.")
+def start_asyncio_in_thread():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run_asyncio_tasks())  # Ensure asyncio tasks run here
 
-# Run the async main function
-asyncio.run(main())
+# Event to stop PyBoy thread gracefully
+stop_event = threading.Event()
 
+# Thread-safe container for sharing pyboy instance
+pyboy_holder = {}
+
+# Run asyncio tasks in a separate thread
+asyncio_thread = threading.Thread(target=start_asyncio_in_thread)
+asyncio_thread.start()
+
+# Start PyBoy in a separate thread
+rom_path = '/path/to/rom.gbc'
+pyboy_thread = threading.Thread(target=run_pyboy, args=(rom_path, stop_event, pyboy_holder))
+pyboy_thread.start()
