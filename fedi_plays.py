@@ -221,7 +221,7 @@ async def run_asyncio_tasks():
             print("Chromium browser launched.")
 
             page = await browser.new_page()
-            await page.goto("https://dalek.zone/plugins/livechat/router/webchat/room/80fc8497-dc83-4f75-b961-120de17716c2#?p=pi6fnM7QuiXlYQu5DOjRWeX105fljH&j=solidheron%40dalek.zone&n=solidheron", timeout=60000)
+            await page.goto("chat_url.here", timeout=60000)
             print("Page loaded.")
 
             # Wait for the first message to load
