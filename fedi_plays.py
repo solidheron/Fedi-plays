@@ -20,14 +20,34 @@ key_mappings = {
     "b": "b",
 }
 
+last_release_time = time.time()
+
+def release_all_buttons(pyboy):
+    """Release all buttons if any are currently pressed."""
+    for button in key_mappings.values():
+        pyboy.button_release(button)
+    #print("All buttons released.")
+
 def send_gameboy_command(pyboy, command, hold_duration=0.35):
-    """Send a command to the PyBoy emulator with a delay between button presses."""
+    """Send a command to the PyBoy emulator with a delay between button presses, and release all buttons every hour."""
+    global last_release_time  # Track the time of the last button release
+    release_all_buttons(pyboy)
+
+    # Get the current time
+    current_time = time.time()
+    
+    # Check if an hour has passed since the last button release
+    if current_time - last_release_time >= 7:  # 3600 seconds = 1 hour
+        #print("Releasing all buttons")
+        #release_all_buttons(pyboy)
+        last_release_time = current_time  # Update the last release time
+
     # List to keep track of buttons that are pressed
     pressed_buttons = []
 
     try:
+        # If "*" is in the command, handle repeated presses like "a*2" or "left*15"
         if "*" in command:
-            # Command like "a*2" or "left*15"
             button, repetitions = command.split('*')
             repetitions = int(repetitions)  # Convert to integer
             
@@ -41,6 +61,8 @@ def send_gameboy_command(pyboy, command, hold_duration=0.35):
                     pyboy.button_press(mapped_key)
                     pressed_buttons.append(mapped_key)  # Track the button pressed
                     time.sleep(hold_duration)  # Hold the button for the specified duration
+                    pyboy.button_release(mapped_key)  # Immediately release the button after press
+                    time.sleep(0.1)  # Optional small delay between presses
             else:
                 print(f"Invalid button in command: {command}")
         else:
@@ -50,13 +72,16 @@ def send_gameboy_command(pyboy, command, hold_duration=0.35):
                 pyboy.button_press(mapped_key)
                 pressed_buttons.append(mapped_key)  # Track the button pressed
                 time.sleep(hold_duration)  # Hold the button for the specified duration
+                pyboy.button_release(mapped_key)  # Release the button after the delay
+                time.sleep(0.1)  # Optional small delay between releases
             else:
                 print(f"Invalid command: {command}")
 
     finally:
-        # Release all buttons after the command has been executed
+        # Ensure all buttons are released at the end (safety)
         for button in pressed_buttons:
             pyboy.button_release(button)
+            release_all_buttons(pyboy)
             time.sleep(0.1)  # Optional small delay between releasing buttons to avoid sticking
 
 
@@ -196,7 +221,7 @@ async def run_asyncio_tasks():
             print("Chromium browser launched.")
 
             page = await browser.new_page()
-            await page.goto("Chat_url_here", timeout=60000)
+            await page.goto("https://dalek.zone/plugins/livechat/router/webchat/room/80fc8497-dc83-4f75-b961-120de17716c2#?p=pi6fnM7QuiXlYQu5DOjRWeX105fljH&j=solidheron%40dalek.zone&n=solidheron", timeout=60000)
             print("Page loaded.")
 
             # Wait for the first message to load
@@ -241,3 +266,4 @@ asyncio_thread.start()
 rom_path = '/path/to/rom.gbc'
 pyboy_thread = threading.Thread(target=run_pyboy, args=(rom_path, stop_event, pyboy_holder))
 pyboy_thread.start()
+
