@@ -147,9 +147,11 @@ async def get_latest_message_from_chat(page):
     message_element = page.locator('.message').last  # Get the last message
     return await message_element.text_content()  # Make sure to await the text content
 
+
 async def check_chat_messages(page, stop_event, pyboy_holder):
     """Function to check chat messages at regular intervals."""
     last_username, last_timestamp, last_content = None, None, None
+    username_map = {}  # A dictionary to track user -> last known username
 
     while not stop_event.is_set():
         try:
@@ -160,21 +162,39 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
             if "This groupchat is not anonymous" in message_content:
                 continue
 
-            # Adjusted regex to handle the provided message structure with extra spaces
+            # Check if the message is related to a nickname change
+            if "Your nickname has been changed to" in message_content:
+                # Check if the nickname change contains the name we want to ignore
+                if "LaNiDoNa Media" in message_content:
+                    print(f"Ignoring nickname change: {message_content}")
+                    continue  # Skip processing this message
+
+            # Normalize command and username
             message_content = message_content.strip()
 
-            # Updated regex to handle multiple spaces and capture the correct parts
-            match = re.match(r"(\S+)\s+(\d{1,2}:\d{2})\s+(\S+)", message_content)
+            # Updated regex to allow spaces in usernames and handle timestamp and command
+            match = re.match(r"([^\s]+(?: [^\s]+)*)\s*(\d{1,2}:\d{2})?\s*(\S+)?", message_content)
 
             if match:
                 username = match.group(1)  # Extract the username
-                timestamp = match.group(2)  # Extract the timestamp
-                command = match.group(3)    # Extract the first command (e.g., Start)
+                timestamp = match.group(2)  # Extract the timestamp (may be None)
+                command = match.group(3)    # Extract the command (may be None)
+
+                if command is None:
+                    print(f"Skipping message from {username} with no command.")
+                    continue
 
                 # Normalize command (convert to lowercase, strip extra spaces)
                 normalized_command = unicodedata.normalize("NFKC", command.lower().strip())
                 normalized_command = normalized_command.replace("\xa0", " ")
                 normalized_command = " ".join(normalized_command.split())
+
+                # Handle user re-naming (track username changes)
+                if username in username_map and username_map[username] != username:
+                    print(f"Username change detected for user: {username}.")
+                    username_map[username] = username  # Update to the new name
+                elif username not in username_map:
+                    username_map[username] = username  # Add new user to the map
 
                 # Create a hash of the entire message to track uniqueness
                 message_hash = hashlib.md5(f"{username}{timestamp}{normalized_command}".encode()).hexdigest()
@@ -212,6 +232,7 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
         # Wait before checking for new messages again
         await asyncio.sleep(4)
 
+
 async def run_asyncio_tasks():
     """Run the async tasks."""
     async with async_playwright() as p:
@@ -221,7 +242,7 @@ async def run_asyncio_tasks():
             print("Chromium browser launched.")
 
             page = await browser.new_page()
-            await page.goto("chat_url.here", timeout=60000)
+            await page.goto("peertube.chat/here", timeout=60000)
             print("Page loaded.")
 
             # Wait for the first message to load
@@ -263,7 +284,6 @@ asyncio_thread = threading.Thread(target=start_asyncio_in_thread)
 asyncio_thread.start()
 
 # Start PyBoy in a separate thread
-rom_path = '/path/to/rom.gbc'
+rom_path = '/path/to/game.gbc'
 pyboy_thread = threading.Thread(target=run_pyboy, args=(rom_path, stop_event, pyboy_holder))
 pyboy_thread.start()
-
