@@ -270,7 +270,7 @@ async def run_asyncio_tasks():
             browser = await p.firefox.launch(headless=False)
             print("Firefox browser launched.")
             page = await browser.new_page()
-            await page.goto("https://peertube.wtf/p/livechat/room?room=7b912924-07bf-4864-a2e2-16e44bdaffa8", timeout=60000)
+            await page.goto("put_peertube_chat_here", timeout=60000)
             print("Page loaded.")
             await page.wait_for_selector('.message', timeout=60000)
             print("First message detected, starting the chat checking thread...")
@@ -306,7 +306,7 @@ asyncio_thread = threading.Thread(target=start_asyncio_in_thread)
 asyncio_thread.start()
 
 # Start PyBoy in a separate thread
-rom_path = r'./GB_set/Dragon Warrior Monsters.gbc'
+rom_path = r'./path/to/rom.gbc'
 pyboy_thread = threading.Thread(target=run_pyboy, args=(rom_path, stop_event, pyboy_holder))
 pyboy_thread.start()
 
