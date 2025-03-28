@@ -225,11 +225,14 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
                 repetitions = int(tokens[1])
 
             # Validate using lower-case conversion for the base command.
+            base_command1 = base_command
+            base_command = base_command.lower()
             if base_command.lower() not in valid_commands:
                 #print(f"Invalid command: {normalized}")
                 continue  # Skip this message
 
             # At this point, the command is valid and processed.
+            #print(base_command.lower())
             normalized_command = f"{base_command}*{repetitions}" if repetitions > 1 else base_command
 
             # (Proceed with duplicate detection and further processing using 'normalized_command')
@@ -241,13 +244,13 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
             last_timestamp = timestamp
             last_content = message_hash
 
-            print(f"Decision: Command '{normalized_command}' triggered based on message: {normalized_command}")
+            print(f"Decision: Command '{normalized_command}' triggered based \non message: {base_command1}")
             pyboy = pyboy_holder.get('pyboy')
             if  pyboy:
                 send_gameboy_command(pyboy, normalized_command)
             else:
                 print("Error: PyBoy instance not found!")
-            print("Latest Message:")
+            #print(f"Latest Message: {original_command}")
             print(f"Username: {username}")
             print(f"Timestamp: {timestamp}")
             print(f"Command: {normalized_command}")
@@ -259,6 +262,8 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
 
         except Exception as e:
             print(f"Error processing message: {e}")
+            await page.reload()
+            print("Page refreshed.")
         previous_last_5_message_content = last_5_message_content
         await asyncio.sleep(4)
 
@@ -270,7 +275,7 @@ async def run_asyncio_tasks():
             browser = await p.firefox.launch(headless=False)
             print("Firefox browser launched.")
             page = await browser.new_page()
-            await page.goto("put_peertube_chat_here", timeout=60000)
+            await page.goto("https://dalek.zone/plugins/livechat/router/webchat/room/80fc8497-dc83-4f75-b961-120de17716c2#?p=pi6fnM7QuiXlYQu5DOjRWeX105fljH&j=solidheron%40dalek.zone&n=solidheron", timeout=60000)
             print("Page loaded.")
             await page.wait_for_selector('.message', timeout=60000)
             print("First message detected, starting the chat checking thread...")
@@ -306,7 +311,7 @@ asyncio_thread = threading.Thread(target=start_asyncio_in_thread)
 asyncio_thread.start()
 
 # Start PyBoy in a separate thread
-rom_path = r'./path/to/rom.gbc'
+rom_path = r'./GB_set/Dragon Warrior Monsters.gbc'
 pyboy_thread = threading.Thread(target=run_pyboy, args=(rom_path, stop_event, pyboy_holder))
 pyboy_thread.start()
 
