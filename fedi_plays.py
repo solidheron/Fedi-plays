@@ -73,8 +73,8 @@ def send_gameboy_command(pyboy, command, hold_duration=0.35):
             button = command
 
         # Cap repetitions at 10
-        if repetitions > 10:
-            repetitions = 10
+        if repetitions > 15:
+            repetitions = 15
 
         if button in key_mappings:
             mapped_key = key_mappings[button]
@@ -83,7 +83,7 @@ def send_gameboy_command(pyboy, command, hold_duration=0.35):
                 pressed_buttons.append(mapped_key)
                 time.sleep(hold_duration)
                 pyboy.button_release(mapped_key)
-                time.sleep(0.1)
+                time.sleep(0.05)
         else:
             print(f"Invalid command/button: {command}")
 
@@ -91,7 +91,7 @@ def send_gameboy_command(pyboy, command, hold_duration=0.35):
         for button in pressed_buttons:
             pyboy.button_release(button)
         release_all_buttons(pyboy)
-        time.sleep(0.1)
+        #time.sleep(0.05)
 
 def save_state(pyboy, save_file):
     """Save the current state of the PyBoy emulator."""
@@ -166,12 +166,18 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
     username_map = {}
     previous_last_5_message_content = await get_last_5_messages_from_chat(page) #gets the last 5 messages
     valid_commands = {"up", "down", "left", "right", "a", "b", "start", "select"}
+    pyboy = pyboy_holder.get('pyboy')
 
     while not stop_event.is_set():
         try:
-            message_content = await get_latest_message_from_chat(page)
-            last_5_message_content = await get_last_5_messages_from_chat(page) #gets the last 5 messages
             
+            last_5_message_content = await get_last_5_messages_from_chat(page) #gets the last 5 messages
+            release_all_buttons(pyboy)
+            if (previous_last_5_message_content == last_5_message_content):
+                await asyncio.sleep(2)
+                continue
+            
+            message_content = await get_latest_message_from_chat(page)
 
             if "This groupchat is not anonymous" in message_content:
                 continue
@@ -237,15 +243,16 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
 
             # (Proceed with duplicate detection and further processing using 'normalized_command')
             message_hash = hashlib.md5(f"{username}{timestamp}{normalized_command}".encode()).hexdigest()
-            if (previous_last_5_message_content == last_5_message_content) and message_hash == last_content:
-                continue
+            if message_hash == last_content:
+                #continue
+                print("message hash match")
 
             last_username = username
             last_timestamp = timestamp
             last_content = message_hash
 
             print(f"Decision: Command '{normalized_command}' triggered based \non message: {base_command1}")
-            pyboy = pyboy_holder.get('pyboy')
+            #pyboy = pyboy_holder.get('pyboy')
             if  pyboy:
                 send_gameboy_command(pyboy, normalized_command)
             else:
@@ -265,7 +272,7 @@ async def check_chat_messages(page, stop_event, pyboy_holder):
             await page.reload()
             print("Page refreshed.")
         previous_last_5_message_content = last_5_message_content
-        await asyncio.sleep(4)
+        #await asyncio.sleep(1)
 
 async def run_asyncio_tasks():
     """Run the async tasks."""
@@ -275,7 +282,7 @@ async def run_asyncio_tasks():
             browser = await p.firefox.launch(headless=False)
             print("Firefox browser launched.")
             page = await browser.new_page()
-            await page.goto("https://dalek.zone/plugins/livechat/router/webchat/room/80fc8497-dc83-4f75-b961-120de17716c2#?p=pi6fnM7QuiXlYQu5DOjRWeX105fljH&j=solidheron%40dalek.zone&n=solidheron", timeout=60000)
+            await page.goto("https://put.your/chaturl/here", timeout=60000)
             print("Page loaded.")
             await page.wait_for_selector('.message', timeout=60000)
             print("First message detected, starting the chat checking thread...")
